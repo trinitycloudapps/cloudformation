@@ -1,0 +1,41 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+
+  Domain:
+    Type: String
+
+  VpcId:
+    Default: none
+    Type: String
+
+Conditions:
+
+  IsPrivate: !Not [ !Equals [ !Ref VpcId, none ] ]
+  IsPublic: !Equals [ !Ref VpcId, none ]
+
+Resources:
+
+  PrivateHostedZone:
+    Type: AWS::Route53::HostedZone
+    Condition: IsPrivate
+    Properties:
+      HostedZoneConfig:
+        Comment: !Sub ${Domain}
+      Name: !Ref Domain
+      VPCs:
+      - VPCId: !Ref VpcId
+        VPCRegion: !Ref 'AWS::Region'
+
+  PublicHostedZone:
+    Type: AWS::Route53::HostedZone
+    Condition: IsPublic
+    Properties:
+      HostedZoneConfig:
+        Comment: !Sub ${Domain}
+      Name: !Ref Domain
+
+Outputs:
+
+  HostedZoneId:
+    Value: !If [ IsPublic, !Ref PublicHostedZone, !Ref PrivateHostedZone ]

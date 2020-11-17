@@ -1,0 +1,300 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+
+  AccessControl:
+    AllowedValues:
+      - none
+      - AuthenticatedRead
+      - AwsExecRead
+      - BucketOwnerFullControl
+      - BucketOwnerRead
+      - LogDeliveryWrite
+      - Private
+      - PublicRead
+      - PublicReadWrite
+    Default: none
+    Type: String
+
+  BlockPublicAcls:
+    AllowedValues:
+      - true
+      - false
+    Default: true
+    Type: String
+
+  BlockPublicPolicy:
+    AllowedValues:
+      - true
+      - false
+    Default: true
+    Type: String
+
+  BucketName:
+    Type: String
+
+  CreateReplicationRole:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
+  DeleteMarkerReplication:
+    AllowedValues:
+      - true
+      - false
+    Default: true
+    Type: String
+
+  EnableEncryption:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
+  EnableReplication:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
+  EnableVersioning:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
+  IgnorePublicAcls:
+    AllowedValues:
+      - true
+      - false
+    Default: true
+    Type: String
+
+  KmsKeyId:
+    Default: none
+    Type: String
+
+  OwnershipControl:
+    AllowedValues:
+      - BucketOwnerPreferred
+      - ObjectWriter
+    Default: BucketOwnerPreferred
+    Type: String
+
+  ReplicaKmsKeyId:
+    Default: none
+    Type: String
+
+  ReplicationAccount:
+    Default: none
+    Type: String
+
+  ReplicationBucketArn:
+    Default: none
+    Type: String
+
+  ReplicateEncryptedObjects:
+    AllowedValues:
+      - true
+      - false
+    Default: true
+    Type: String
+
+  ReplicationRoleArn:
+    Default: none
+    Type: String
+
+  RestrictPublicBuckets:
+    AllowedValues:
+      - true
+      - false
+    Default: true
+    Type: String
+
+  Sequence:
+    Default: 1
+    Type: String
+
+  SnsSubscriptionTopicArn:
+    Default: none
+    Type: String
+
+  SseAlgorithm:
+    AllowedValues:
+      - aws:kms
+      - AES256
+    Default: AES256
+    Type: String
+
+  Stage:
+    Type: String
+
+Conditions:
+
+  CreateReplicationRole: !Equals [ !Ref CreateReplicationRole, true ]
+  EnableEncryption: !Equals [ !Ref EnableEncryption, true ]
+  EnableReplication: !Equals [ !Ref EnableReplication, true ]
+  EnableVersioning: !Equals [ !Ref EnableVersioning, true ]
+  HasAccessControl: !Not [ !Equals [ !Ref AccessControl, none ] ]
+  HasKmsKeyId: !Not [ !Equals [ !Ref KmsKeyId, none ] ]
+  HasReplicaKmsKeyId: !Not [ !Equals [ !Ref ReplicaKmsKeyId, none ] ]
+  HasReplicationAccount: !Not [ !Equals [ !Ref ReplicationAccount, none ] ]
+  HasSnsSubscription: !Not [ !Equals [ !Ref SnsSubscriptionTopicArn, none ] ]
+  ReplicateDeleteMarkers: !Equals [ !Ref DeleteMarkerReplication, true ]
+  ReplicateEncryptedObjects: !Equals [ !Ref ReplicateEncryptedObjects, true ]
+
+Resources:
+
+  Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: !If [ HasAccessControl, !Ref AccessControl, !Ref 'AWS::NoValue' ]
+      BucketEncryption:
+        !If
+        - EnableEncryption
+        - ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              KMSMasterKeyID: !If [ HasKmsKeyId, !Ref KmsKeyId, !Ref 'AWS::NoValue' ]
+              SSEAlgorithm: !Ref SseAlgorithm
+        - !Ref 'AWS::NoValue'
+      BucketName: !Sub ${AWS::AccountId}-${AWS::Region}-${Stage}-${Sequence}-${BucketName}
+      NotificationConfiguration:
+        !If
+        - HasSnsSubscription
+        - TopicConfigurations:
+          - Event: s3:ObjectCreated:Put
+            Topic: !Ref SnsSubscriptionTopicArn
+        - !Ref 'AWS::NoValue'
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: !Ref OwnershipControl
+      ReplicationConfiguration:
+        !If
+        - EnableReplication
+        - Role: !If [ CreateReplicationRole, !GetAtt ReplicationRole.Arn, Ref ReplicationRoleArn ]
+          Rules:
+            - DeleteMarkerReplication:
+                !If
+                - ReplicateDeleteMarkers
+                - !Ref 'AWS::NoValue'
+                - Status: Disabled
+              Destination:
+                AccessControlTranslation:
+                  Owner: Destination
+                Account: !If [ HasReplicationAccount, !Ref ReplicationAccount, !Ref 'AWS::AccountId' ]
+                Bucket: !Ref ReplicationBucketArn
+                EncryptionConfiguration:
+                  ReplicaKmsKeyID: !If [ HasReplicaKmsKeyId, !Ref ReplicaKmsKeyId, !Ref KmsKeyId ]
+              Prefix: !If [ ReplicateDeleteMarkers, '', !Ref 'AWS::NoValue' ]
+              SourceSelectionCriteria:
+                SseKmsEncryptedObjects:
+                  Status: !If [ ReplicateEncryptedObjects, Enabled, Disabled ]
+              Status: Enabled
+        - !Ref 'AWS::NoValue'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: !Ref BlockPublicAcls
+        BlockPublicPolicy: !Ref BlockPublicPolicy
+        IgnorePublicAcls: !Ref IgnorePublicAcls
+        RestrictPublicBuckets: !Ref RestrictPublicBuckets
+      VersioningConfiguration:
+        Status: !If [ EnableVersioning, Enabled, Suspended ]
+
+  ReplicationRole:
+    Condition: CreateReplicationRole
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - s3.amazonaws.com
+
+  ReplicationRolePolicy:
+    Condition: CreateReplicationRole
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - s3:GetReplicationConfiguration
+              - s3:ListBucket
+              - s3:ListBucketVersions
+            Effect: Allow
+            Resource:
+              - !Join
+                - ''
+                - - !Sub 'arn:${AWS::Partition}:s3:::'
+                  - !Sub ${AWS::AccountId}-${AWS::Region}-${Stage}-${Sequence}-${BucketName}
+          - Action:
+              - s3:GetObjectVersion
+              - s3:GetObjectVersionAcl
+              - s3:GetObjectVersionForReplication
+              - s3:GetObjectVersionTagging
+            Effect: Allow
+            Resource:
+              - !Join
+                - ''
+                - - !Sub 'arn:${AWS::Partition}:s3:::'
+                  - !Join
+                    - ''
+                    - - !Sub ${AWS::AccountId}-${AWS::Region}-${Stage}-${Sequence}-${BucketName}
+                  - '/*'
+          - Action:
+              - s3:ObjectOwnerOverrideToBucketOwner
+              - s3:ReplicateDelete
+              - s3:ReplicateObject
+              - s3:ReplicateTags
+            Effect: Allow
+            Resource:
+              - !Sub ${ReplicationBucketArn}/*
+          - !If
+            - EnableEncryption
+            - Action:
+                - kms:Decrypt
+                - kms:Encrypt
+              Effect: Allow
+              Resource:
+                - !If [ HasKmsKeyId, !Ref KmsKeyId, !Ref 'AWS::NoValue' ]
+                - !If [ HasReplicaKmsKeyId, !Ref ReplicaKmsKeyId, !Ref 'AWS::NoValue' ]
+            - !Ref 'AWS::NoValue'
+      PolicyName: !Sub ${ReplicationRole}-replication-policy
+      Roles:
+        - !Ref ReplicationRole
+
+  SnsTopicPolicy:
+    Condition: HasSnsSubscription
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Id: SNSTopicPolicy
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS:
+                - '*'
+            Action:
+              - sns:Publish
+            Resource:
+              - !Ref SnsSubscriptionTopicArn
+            Condition:
+              ArnLike:
+                aws:SourceArn: !GetAtt Bucket.Arn
+      Topics:
+        - !Ref SnsSubscriptionTopicArn
+
+Outputs:
+
+  BucketArn:
+    Value: !GetAtt Bucket.Arn
+
+  BucketName:
+    Value: !Ref Bucket

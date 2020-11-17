@@ -1,0 +1,191 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+
+  AutoMinorVersionUpgrade:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
+  BackupRetentionPeriod:
+    Default: 7
+    Type: String
+
+  ClusterName:
+    Type: String
+
+  DatabaseName:
+    Default: none
+    Type: String
+
+  DeletionProtection:
+    AllowedValues:
+      - true
+      - false
+    Default: true
+    Type: String
+
+  EnablePerformanceInsights:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
+  EngineVersion:
+    Default: 5.7.mysql_aurora.2.08.2
+    Type: String
+
+  InstanceClass:
+    Default: db.t3.small
+    Type: String
+
+  KmsKeyId:
+    Default: none
+    Type: String
+
+  MasterUsername:
+    Default: root
+    Type: String
+
+  MasterUserPassword:
+    Default: password
+    Type: String
+
+  MultiAz:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
+  Port:
+    Default: 3306
+    Type: String
+
+  Sequence:
+    Default: 1
+    Type: String
+
+  SlowQueryLogGroupRetention:
+    Default: 30
+    Type: String
+
+  SnapshotIdentifier:
+    Default: none
+    Type: String
+
+  StackUrl:
+    Type: String
+
+  Stage:
+    Type: String
+
+  SubnetIds:
+    Type: String
+
+  ThreeInstances:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
+  TwoInstances:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
+  VpcCidr:
+    Type: String
+
+  VpcId:
+    Type: String
+
+Conditions:
+
+  HasSecondInstance: !Or [ !Equals [ !Ref TwoInstances, true ], !Equals [ !Ref ThreeInstances, true ] ]
+  HasThirdInstance: !Equals [ !Ref ThreeInstances, true ]
+
+Resources:
+
+  RdsAuroraMySqlClusterSubStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      Parameters:
+        BackupRetentionPeriod: !Ref BackupRetentionPeriod
+        ClusterName: !Ref ClusterName
+        DatabaseName: !Ref DatabaseName
+        DeletionProtection: !Ref DeletionProtection
+        EngineVersion: !Ref EngineVersion
+        KmsKeyId: !Ref KmsKeyId
+        MasterUsername: !Ref MasterUsername
+        MasterUserPassword: !Ref MasterUserPassword
+        Port: !Ref Port
+        Sequence: !Ref Sequence
+        SlowQueryLogGroupRetention: !Ref SlowQueryLogGroupRetention
+        SnapshotIdentifier: !Ref SnapshotIdentifier
+        Stage: !Ref Stage
+        SubnetIds: !Ref SubnetIds
+        VpcCidr: !Ref VpcCidr
+        VpcId: !Ref VpcId
+      TemplateURL: !Sub ${StackUrl}/rds/aurora-mysql/cluster.yaml
+
+  RdsAuroraMySqlInstance1:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      Parameters:
+        AutoMinorVersionUpgrade: !Ref AutoMinorVersionUpgrade
+        ClusterName: !Ref ClusterName
+        DBClusterIdentifier: !GetAtt RdsAuroraMySqlClusterSubStack.Outputs.DBClusterIdentifier
+        InstanceClass: !Ref InstanceClass
+        EnablePerformanceInsights: !Ref EnablePerformanceInsights
+        MultiAz: !Ref MultiAz
+        ParameterGroup: !GetAtt RdsAuroraMySqlClusterSubStack.Outputs.InstanceParameterGroup
+        SecurityGroup: !GetAtt RdsAuroraMySqlClusterSubStack.Outputs.SecurityGroup
+        Sequence: !Sub ${Sequence}-1
+        Stage: !Ref Stage
+      TemplateURL: !Sub ${StackUrl}/rds/aurora-mysql/instance.yaml
+
+  RdsAuroraMySqlInstance2:
+    Condition: HasSecondInstance
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      Parameters:
+        AutoMinorVersionUpgrade: !Ref AutoMinorVersionUpgrade
+        ClusterName: !Ref ClusterName
+        DBClusterIdentifier: !GetAtt RdsAuroraMySqlClusterSubStack.Outputs.DBClusterIdentifier
+        EnablePerformanceInsights: !Ref EnablePerformanceInsights
+        InstanceClass: !Ref InstanceClass
+        MultiAz: !Ref MultiAz
+        ParameterGroup: !GetAtt RdsAuroraMySqlClusterSubStack.Outputs.InstanceParameterGroup
+        SecurityGroup: !GetAtt RdsAuroraMySqlClusterSubStack.Outputs.SecurityGroup
+        Sequence: !Sub ${Sequence}-2
+        Stage: !Ref Stage
+      TemplateURL: !Sub ${StackUrl}/rds/aurora-mysql/instance.yaml
+
+  RdsAuroraMySqlInstance3:
+    Condition: HasThirdInstance
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      Parameters:
+        AutoMinorVersionUpgrade: !Ref AutoMinorVersionUpgrade
+        ClusterName: !Ref ClusterName
+        DBClusterIdentifier: !GetAtt RdsAuroraMySqlClusterSubStack.Outputs.DBClusterIdentifier
+        EnablePerformanceInsights: !Ref EnablePerformanceInsights
+        InstanceClass: !Ref InstanceClass
+        MultiAz: !Ref MultiAz
+        ParameterGroup: !GetAtt RdsAuroraMySqlClusterSubStack.Outputs.InstanceParameterGroup
+        SecurityGroup: !GetAtt RdsAuroraMySqlClusterSubStack.Outputs.SecurityGroup
+        Sequence: !Sub ${Sequence}-3
+        Stage: !Ref Stage
+      TemplateURL: !Sub ${StackUrl}/rds/aurora-mysql/instance.yaml
+
+Outputs:
+
+  DBClusterIdentifier:
+    Value: !GetAtt RdsAuroraMySqlClusterSubStack.Outputs.DBClusterIdentifier

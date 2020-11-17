@@ -1,0 +1,138 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+
+  BastionAmiId:
+    Default: none
+    Type: String
+
+  BastionInstanceType:
+    Default: t3.nano
+    Type: String
+
+  BastionKeyName:
+    Default: none
+    Type: String
+
+  CidrClassB:
+    Type: String
+
+  Domain:
+    Default: none
+    Type: String
+
+  Name:
+    Type: String
+
+  NatAmiId:
+    Type: String
+
+  NatInstanceType:
+    Default: t3.nano
+    Type: String
+
+  NatKeyName:
+    Default: none
+    Type: String
+
+  Sequence:
+    Default: 1
+    Type: String
+
+  StackUrl:
+    Type: String
+
+  Stage:
+    Type: String
+
+  TwoAvailabilityZones:
+    AllowedValues:
+      - true
+      - false
+    Default: true
+    Type: String
+
+Conditions:
+
+  CreateNatInstanceB: !And
+    - !Not [ !Equals [ !Ref NatInstanceType, none ] ]
+    - !Equals [ !Ref TwoAvailabilityZones, true ]
+  HasBastion: !Not [ !Equals [ !Ref BastionAmiId, none ] ]
+  HasBastionKeyName: !Not [ !Equals [ !Ref BastionKeyName, none ] ]
+  HasDomain: !Not [ !Equals [ !Ref Domain, none ] ]
+  HasNatInstance: !Not [ !Equals [ !Ref NatInstanceType, none ] ]
+  HasNatKeyName: !Not [ !Equals [ !Ref NatKeyName, none ] ]
+
+Resources:
+
+  BastionStack:
+    Type: AWS::CloudFormation::Stack
+    Condition: HasBastion
+    Properties:
+      Parameters:
+        AmiId: !Ref BastionAmiId
+        DomainName: !If [ HasDomain, !Sub '${Name}-${Stage}-bastion.${Domain}', none ]
+        HostedZoneId: !If [ HasDomain, !GetAtt PublicHostedZone.Outputs.HostedZoneId, none ]
+        InstanceType: !Ref BastionInstanceType
+        KeyName: !If [ HasBastionKeyName, !Ref BastionKeyName, !Ref 'AWS::NoValue' ]
+        Stage: !Ref Stage
+        SubnetIdList: !GetAtt VpcSubStack.Outputs.PublicSubnetIdList
+        VpcCidr: !GetAtt VpcSubStack.Outputs.VpcCidr
+        VpcId: !GetAtt VpcSubStack.Outputs.VpcId
+      TemplateURL: !Sub ${StackUrl}/vpc/bastion.yaml
+
+  PrivateHostedZone:
+    Type: AWS::CloudFormation::Stack
+    Condition: HasDomain
+    Properties:
+      Parameters:
+        Domain: !Sub internal.${Domain}
+        VpcId: !GetAtt VpcSubStack.Outputs.VpcId
+      TemplateURL: !Sub ${StackUrl}/vpc/hosted-zone.yaml
+
+  PublicHostedZone:
+    Type: AWS::CloudFormation::Stack
+    Condition: HasDomain
+    Properties:
+      Parameters:
+        Domain: !Ref Domain
+      TemplateURL: !Sub ${StackUrl}/vpc/hosted-zone.yaml
+
+  SubnetANatInstance:
+    Condition: HasNatInstance
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      Parameters:
+        AmiId: !Ref NatAmiId
+        InstanceType: !Ref NatInstanceType
+        KeyName: !If [ HasNatKeyName, !Ref NatKeyName, !Ref 'AWS::NoValue' ]
+        PublicSubnetId: !GetAtt VpcSubStack.Outputs.PublicSubnetA
+        RouteTableId: !GetAtt VpcSubStack.Outputs.PrivateNatSubnetARouteTable
+        VpcCidr: !GetAtt VpcSubStack.Outputs.VpcCidr
+        VpcId: !GetAtt VpcSubStack.Outputs.VpcId
+      TemplateURL: !Sub ${StackUrl}/vpc/nat-instance.yaml
+
+  SubnetBNatInstance:
+    Condition: CreateNatInstanceB
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      Parameters:
+        AmiId: !Ref NatAmiId
+        InstanceType: !Ref NatInstanceType
+        KeyName: !If [ HasNatKeyName, !Ref NatKeyName, !Ref 'AWS::NoValue' ]
+        PublicSubnetId: !GetAtt VpcSubStack.Outputs.PublicSubnetB
+        RouteTableId: !GetAtt VpcSubStack.Outputs.PrivateNatSubnetBRouteTable
+        VpcCidr: !GetAtt VpcSubStack.Outputs.VpcCidr
+        VpcId: !GetAtt VpcSubStack.Outputs.VpcId
+      TemplateURL: !Sub ${StackUrl}/vpc/nat-instance.yaml
+
+  VpcSubStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      Parameters:
+        CidrClassB: !Ref CidrClassB
+        Name: !Ref Name
+        Sequence: !Ref Sequence
+        Stage: !Ref Stage
+        TwoAvailabilityZones: !Ref TwoAvailabilityZones
+      TemplateURL: !Sub ${StackUrl}/vpc/vpc.yaml

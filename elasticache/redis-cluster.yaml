@@ -1,0 +1,157 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+
+  AutoMinorVersionUpgrade:
+    AllowedValues:
+      - true
+      - false
+    Default: true
+    Type: String
+
+  ClusterName:
+    Type: String
+
+  CreatePrimaryCluster:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
+  InstanceType:
+    Default: cache.t3.micro
+    Type: String
+
+  EngineVersion:
+    Default: 5.0.6
+    Type: String
+
+  MultiAz:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
+  NumNodeGroups:
+    Default: 1
+    Type: String
+
+  Port:
+    Default: 6379
+    Type: String
+
+  ReplicasPerNodeGroup:
+    AllowedValues:
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+    Default: 0
+    Type: String
+
+  Sequence:
+    Default: 1
+    Type: String
+
+  SnapshotRetentionLimit:
+    Default: none
+    Type: String
+
+  Stage:
+    Type: String
+
+  SubnetIds:
+    Type: CommaDelimitedList
+
+  VpcId:
+    Type: String
+
+Conditions:
+
+  CreateReplicationGroup: !Equals [ !Ref CreatePrimaryCluster, false ]
+  CreateSinglePrimaryCluster: !Equals [ !Ref CreatePrimaryCluster, true ]
+  HasSnapshotRetentionLimit: !Not [ !Equals [ !Ref SnapshotRetentionLimit, none ] ]
+  IsMultiAz: !Equals [ !Ref MultiAz, true ]
+
+Resources:
+
+  CacheCluster:
+    Condition: CreateSinglePrimaryCluster
+    Type: AWS::ElastiCache::CacheCluster
+    Properties:
+      AutoMinorVersionUpgrade: !Ref AutoMinorVersionUpgrade
+      AZMode: !If [ IsMultiAz, cross-az, single-az ]
+      CacheNodeType: !Ref InstanceType
+      CacheParameterGroupName: !Ref ParameterGroup
+      CacheSubnetGroupName: !Ref SubnetGroup
+      ClusterName: !Sub ${ClusterName}-${Stage}-${Sequence}-redis-cluster
+      Engine: redis
+      EngineVersion: !Ref EngineVersion
+#      NotificationTopicArn: String
+      NumCacheNodes: 1
+      Port: !Ref Port
+      SnapshotRetentionLimit: !If [ HasSnapshotRetentionLimit, !Ref SnapshotRetentionLimit, !Ref 'AWS::NoValue' ]
+      VpcSecurityGroupIds:
+        - !GetAtt SecurityGroup.GroupId
+
+  ParameterGroup:
+    Type: AWS::ElastiCache::ParameterGroup
+    Properties:
+      CacheParameterGroupFamily: redis5.0
+      Description: !Sub ${ClusterName}-${Stage}-${Sequence}-redis-cluster
+      Properties: !If
+        - CreateReplicationGroup
+        - {
+            "cluster-enabled": "yes"
+          }
+        - {
+            "cluster-enabled": "no"
+          }
+
+  ReplicationGroup:
+    Condition: CreateReplicationGroup
+    Type: AWS::ElastiCache::ReplicationGroup
+    Properties:
+#      AutomaticFailoverEnabled: true
+      CacheNodeType: !Ref InstanceType
+      CacheParameterGroupName: !Ref ParameterGroup
+      CacheSubnetGroupName: !Ref SubnetGroup
+      Engine: redis
+      EngineVersion: !Ref EngineVersion
+      NumNodeGroups: !Ref NumNodeGroups
+      ReplicasPerNodeGroup: !Ref ReplicasPerNodeGroup
+      ReplicationGroupDescription: !Ref 'AWS::StackName'
+      ReplicationGroupId: !Sub ${ClusterName}-${Stage}-${Sequence}-redis-group
+      SecurityGroupIds:
+        - !Ref SecurityGroup
+      SnapshotRetentionLimit: !If [ HasSnapshotRetentionLimit, !Ref SnapshotRetentionLimit, !Ref 'AWS::NoValue' ]
+      Tags:
+        - Key: Name
+          Value: !Sub ${ClusterName}-${Stage}-${Sequence}-redis-group
+    UpdatePolicy:
+      UseOnlineResharding: true
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub ${ClusterName}-${Stage}-${Sequence}-redis-cluster-security-group
+      GroupName: !Sub ${ClusterName}-${Stage}-${Sequence}-redis-cluster-security-group
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref Port
+          ToPort: !Ref Port
+      Tags:
+        - Key: Name
+          Value: !Sub ${ClusterName}-${Stage}-${Sequence}-redis-cluster-security-group
+
+  SubnetGroup:
+    Type: AWS::ElastiCache::SubnetGroup
+    Properties:
+      CacheSubnetGroupName: !Sub ${ClusterName}-${Stage}-${Sequence}-redis-cluster-subnet-group
+      Description: description
+      SubnetIds: !Ref SubnetIds

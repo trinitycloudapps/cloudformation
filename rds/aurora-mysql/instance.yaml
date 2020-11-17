@@ -1,0 +1,77 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+
+  AutoMinorVersionUpgrade:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
+  AvailabilityZone:
+    AllowedValues:
+      - a
+      - b
+      - c
+      - d
+      - e
+      - f
+      - none
+    Default: none
+    Type: String
+
+  BackupRetentionPeriod:
+    Default: none
+    Type: String
+
+  ClusterName:
+    Type: String
+
+  DBClusterIdentifier:
+    Default: none
+    Type: String
+
+  EnablePerformanceInsights:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
+  InstanceClass:
+    Default: db.t3.small
+    Type: String
+
+  ParameterGroup:
+    Type: String
+
+  SecurityGroup:
+    Type: String
+
+  Sequence:
+    Default: 1
+    Type: String
+
+  Stage:
+    Type: String
+
+Conditions:
+
+  HasAvailabilityZone: !Not [ !Equals [ !Ref AvailabilityZone, none ] ]
+  HasBackupRetentionPeriod: !Not [ !Equals [ !Ref BackupRetentionPeriod, none ] ]
+
+Resources:
+
+  DatabaseInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      AutoMinorVersionUpgrade: !Ref AutoMinorVersionUpgrade
+      AvailabilityZone: !If [ HasAvailabilityZone, !Sub '${AWS::Region}${AvailabilityZone}', !Ref 'AWS::NoValue' ]
+      BackupRetentionPeriod: !If [ HasBackupRetentionPeriod, !Ref BackupRetentionPeriod, !Ref 'AWS::NoValue' ]
+      DBClusterIdentifier: !Ref DBClusterIdentifier
+      DBInstanceClass: !Ref InstanceClass
+      DBInstanceIdentifier: !Sub ${ClusterName}-${Stage}-aurora-instance-${Sequence}
+      DBParameterGroupName: !Ref ParameterGroup
+      EnablePerformanceInsights: !Ref EnablePerformanceInsights
+      Engine: aurora-mysql

@@ -1,0 +1,55 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+
+  ContentBasedDeduplication:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
+  DisplayName:
+    Default: none
+    Type: String
+
+  IsFifoTopic:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
+  KmsKeyId:
+    Default: none
+    Type: String
+
+  TopicName:
+    Default: none
+    Type: String
+
+Conditions:
+
+  HasDisplayName: !Not [ !Equals [ !Ref DisplayName, none ] ]
+  HasKmsKeyId: !Not [ !Equals [ !Ref KmsKeyId, none ] ]
+  HasTopicName: !Not [ !Equals [ !Ref TopicName, none ] ]
+  IsFifoTopic: !Equals [ !Ref IsFifoTopic, true ]
+
+Resources:
+
+  SnsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      ContentBasedDeduplication: !If [ IsFifoTopic, !Ref ContentBasedDeduplication, !Ref 'AWS::NoValue' ]
+      DisplayName: !If [ HasDisplayName, !Ref DisplayName, !Ref TopicName ]
+      FifoTopic: !Ref IsFifoTopic
+      KmsMasterKeyId: !If [ HasKmsKeyId, !Ref KmsKeyId, !Ref 'AWS::NoValue' ]
+      TopicName: !If [ HasTopicName, !Ref TopicName, !Ref 'AWS::NoValue' ]
+
+Outputs:
+
+  TopicArn:
+    Value: !Ref SnsTopic
+
+  TopicName:
+    Value: !GetAtt SnsTopic.TopicName

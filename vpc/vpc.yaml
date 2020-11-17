@@ -1,0 +1,372 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+
+  CidrClassB:
+    Type: String
+
+  Name:
+    Type: String
+
+  Sequence:
+    Default: 1
+    Type: String
+
+  Stage:
+    Type: String
+
+  TwoAvailabilityZones:
+    AllowedValues:
+      - true
+      - false
+    Default: true
+    Type: String
+
+Conditions:
+
+  CreateAvailabilityZoneB: !Equals [ !Ref TwoAvailabilityZones, true ]
+
+Resources:
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${Name}-${Stage}-${Sequence}-internet-gateway
+
+  PrivateNatSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: !Sub 10.${CidrClassB}.96.0/20
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${Name}-${Stage}-${Sequence}-private-nat-subnet-a
+
+  PrivateNatSubnetARouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${Name}-${Stage}-${Sequence}-private-nat-routetable-a
+      VpcId: !Ref Vpc
+
+  PrivateNatSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateNatSubnetA
+      RouteTableId: !Ref PrivateNatSubnetARouteTable
+
+  PrivateNatNetworkAcl:
+    Type: AWS::EC2::NetworkAcl
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${Name}-${Stage}-${Sequence}-private-nat-network-acl
+      VpcId: !Ref Vpc
+
+  PrivateNatNetworkAclEntryAllowVpcIn:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: '0.0.0.0/0'
+      Egress: false
+      NetworkAclId: !Ref PrivateNatNetworkAcl
+      Protocol: -1
+      RuleAction: allow
+      RuleNumber: 1
+
+  PrivateNatNetworkAclEntryAllowAllOut:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: '0.0.0.0/0'
+      Egress: true
+      NetworkAclId: !Ref PrivateNatNetworkAcl
+      Protocol: -1
+      RuleAction: allow
+      RuleNumber: 1
+
+  PrivateNatNetworkAclSubnetAAssociation:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref PrivateNatNetworkAcl
+      SubnetId: !Ref PrivateNatSubnetA
+
+  PrivateNatNetworkAclSubnetBAssociation:
+    Condition: CreateAvailabilityZoneB
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref PrivateNatNetworkAcl
+      SubnetId: !Ref PrivateNatSubnetB
+
+  PrivateNatSubnetB:
+    Condition: CreateAvailabilityZoneB
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: !Sub 10.${CidrClassB}.112.0/20
+      Tags:
+        - Key: Name
+          Value: !Sub ${Name}-${Stage}-${Sequence}-private-nat-subnet-b
+      VpcId: !Ref Vpc
+
+  PrivateNatSubnetBRouteTable:
+    Condition: CreateAvailabilityZoneB
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${Name}-${Stage}-${Sequence}-private-nat-routetable-b
+      VpcId: !Ref Vpc
+
+  PrivateNatSubnetBRouteTableAssociation:
+    Condition: CreateAvailabilityZoneB
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateNatSubnetB
+      RouteTableId: !Ref PrivateNatSubnetBRouteTable
+
+  PrivateNetworkAcl:
+    Type: AWS::EC2::NetworkAcl
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${Name}-${Stage}-${Sequence}-private-network-acl
+      VpcId: !Ref Vpc
+
+  PrivateNetworkAclEntryAllowVpcIn:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: !GetAtt Vpc.CidrBlock
+      Egress: false
+      NetworkAclId: !Ref PrivateNetworkAcl
+      Protocol: -1
+      RuleAction: allow
+      RuleNumber: 1
+
+  PrivateNetworkAclEntryAllowVpcOut:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: !GetAtt Vpc.CidrBlock
+      Egress: true
+      NetworkAclId: !Ref PrivateNetworkAcl
+      Protocol: -1
+      RuleAction: allow
+      RuleNumber: 1
+
+  PrivateNetworkAclSubnetAAssociation:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref PrivateNetworkAcl
+      SubnetId: !Ref PrivateSubnetA
+
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: !Sub 10.${CidrClassB}.0.0/20
+      Tags:
+        - Key: Name
+          Value: !Sub ${Name}-${Stage}-${Sequence}-private-subnet-a
+      VpcId: !Ref Vpc
+
+  PrivateSubnetRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${Name}-${Stage}-${Sequence}-private-routetable
+      VpcId: !Ref Vpc
+
+  PrivateSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetA
+      RouteTableId: !Ref PrivateSubnetRouteTable
+
+  PrivateNetworkAclSubnetBAssociation:
+    Condition: CreateAvailabilityZoneB
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref PrivateNetworkAcl
+      SubnetId: !Ref PrivateSubnetB
+
+  PrivateSubnetB:
+    Condition: CreateAvailabilityZoneB
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: !Sub 10.${CidrClassB}.16.0/20
+      Tags:
+        - Key: Name
+          Value: !Sub ${Name}-${Stage}-${Sequence}-private-subnet-b
+      VpcId: !Ref Vpc
+
+  PrivateSubnetBRouteTableAssociation:
+    Condition: CreateAvailabilityZoneB
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetB
+      RouteTableId: !Ref PrivateSubnetRouteTable
+
+  PublicNetworkAcl:
+    Type: AWS::EC2::NetworkAcl
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${Name}-${Stage}-${Sequence}-public-network-acl
+      VpcId: !Ref Vpc
+
+  PublicNetworkAclEntryAllowAllIn:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: '0.0.0.0/0'
+      Egress: false
+      NetworkAclId: !Ref PublicNetworkAcl
+      Protocol: -1
+      RuleAction: allow
+      RuleNumber: 1
+
+  PublicNetworkAclEntryAllowAllOut:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: '0.0.0.0/0'
+      Egress: true
+      NetworkAclId: !Ref PublicNetworkAcl
+      Protocol: -1
+      RuleAction: allow
+      RuleNumber: 1
+
+  PublicNetworkAclSubnetAAssociation:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref PublicNetworkAcl
+      SubnetId: !Ref PublicSubnetA
+
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: !Sub 10.${CidrClassB}.48.0/20
+      Tags:
+        - Key: Name
+          Value: !Sub ${Name}-${Stage}-${Sequence}-public-subnet-a
+      VpcId: !Ref Vpc
+
+  PublicSubnetRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${Name}-${Stage}-${Sequence}-public-routetable
+      VpcId: !Ref Vpc
+
+  PublicSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetA
+      RouteTableId: !Ref PublicSubnetRouteTable
+
+  PublicSubnetRouteTableInternetRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref PublicSubnetRouteTable
+    DependsOn:
+      - VpcGatewayAttachment
+
+  PublicNetworkAclSubnetBAssociation:
+    Condition: CreateAvailabilityZoneB
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref PublicNetworkAcl
+      SubnetId: !Ref PublicSubnetB
+
+  PublicSubnetB:
+    Condition: CreateAvailabilityZoneB
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: !Sub 10.${CidrClassB}.64.0/20
+      Tags:
+        - Key: Name
+          Value: !Sub ${Name}-${Stage}-${Sequence}-public-subnet-b
+      VpcId: !Ref Vpc
+
+  PublicSubnetBRouteTableAssociation:
+    Condition: CreateAvailabilityZoneB
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetB
+      RouteTableId: !Ref PublicSubnetRouteTable
+
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Sub 10.${CidrClassB}.0.0/16
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${Name}-${Stage}-${Sequence}-vpc
+
+  VpcGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+Outputs:
+
+  PrivateNatSubnetA:
+    Value: !Ref PrivateNatSubnetA
+
+  PrivateNatSubnetB:
+    Condition: CreateAvailabilityZoneB
+    Value: !Ref PrivateNatSubnetB
+
+  PrivateNatSubnetARouteTable:
+    Value: !Ref PrivateNatSubnetARouteTable
+
+  PrivateNatSubnetBRouteTable:
+    Condition: CreateAvailabilityZoneB
+    Value: !Ref PrivateNatSubnetBRouteTable
+
+  PrivateNatSubnetIdList:
+    Value: !If
+      - CreateAvailabilityZoneB
+      - !Join [',', [ !Ref PrivateNatSubnetA, !Ref PrivateNatSubnetB ] ]
+      - !Ref PrivateNatSubnetA
+
+  PrivateSubnetA:
+    Value: !Ref PrivateSubnetA
+
+  PrivateSubnetB:
+    Condition: CreateAvailabilityZoneB
+    Value: !Ref PrivateSubnetB
+
+  PrivateSubnetIdList:
+    Value: !If
+      - CreateAvailabilityZoneB
+      - !Join [',', [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ] ]
+      - !Ref PrivateSubnetA
+
+  PublicSubnetA:
+    Value: !Ref PublicSubnetA
+
+  PublicSubnetB:
+    Condition: CreateAvailabilityZoneB
+    Value: !Ref PublicSubnetB
+
+  PublicSubnetIdList:
+    Value: !If
+      - CreateAvailabilityZoneB
+      - !Join [',', [ !Ref PublicSubnetA, !Ref PublicSubnetB ] ]
+      - !Ref PublicSubnetA
+
+  VpcCidr:
+    Value: !GetAtt Vpc.CidrBlock
+
+  VpcId:
+    Value: !Ref Vpc

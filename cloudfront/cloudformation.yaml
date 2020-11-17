@@ -1,0 +1,107 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+
+  ApplicationName:
+    Type: String
+
+  CertificateArn:
+    Type: String
+
+  DnsTtl:
+    Default: 300
+    Type: String
+
+  DomainName:
+    Type: String
+
+  HostedZoneId:
+    Type: String
+
+  Sequence:
+    Default: 1
+    Type: String
+
+  Stage:
+    Type: String
+
+Conditions:
+
+  CreateRecordSet: !And [ !Not [ !Equals [ !Ref DomainName, none ] ], !Not [ !Equals [ !Ref HostedZoneId, none ] ] ]
+
+Resources:
+
+  CloudFront:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Aliases:
+          - !Ref DomainName
+        DefaultCacheBehavior:
+          AllowedMethods:
+            - GET
+            - HEAD
+          Compress: true
+          ForwardedValues:
+            QueryString: false
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+        DefaultRootObject: index.html
+        Enabled: true
+        HttpVersion: http2
+        Origins:
+          - DomainName: !GetAtt S3Bucket.DomainName
+            Id: S3Origin
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub
+                - origin-access-identity/cloudfront/${AccessIdentity}
+                - AccessIdentity: !Ref CloudFrontOriginAccessIdentity
+        PriceClass: PriceClass_100
+        ViewerCertificate:
+          AcmCertificateArn: !Ref CertificateArn
+          SslSupportMethod: sni-only
+
+  CloudFrontOriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: CloudFrontOriginAccessIdentity
+
+  RecordSet:
+    Condition: CreateRecordSet
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref DomainName
+      ResourceRecords:
+        - !GetAtt CloudFront.DomainName
+      TTL: !Ref DnsTtl
+      Type: CNAME
+
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: Private
+      BucketName: !Sub ${AWS::AccountId}-${AWS::Region}-${ApplicationName}-${Stage}-${Sequence}-asset-bucket
+      WebsiteConfiguration:
+        ErrorDocument: 404.html
+        IndexDocument: index.html
+
+  S3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3Bucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
+            Action:
+              - 's3:GetObject'
+            Resource:
+              - !Join [ '', [ !GetAtt S3Bucket.Arn, '/*' ] ]
+
+Outputs:
+
+  S3BucketName:
+    Value: !Ref S3Bucket

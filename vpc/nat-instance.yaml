@@ -1,0 +1,143 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+
+  AmiId:
+    Type: AWS::EC2::Image::Id
+
+  GitRepoLocation:
+    Default: https://github.com/trinitycloudapps/cloudformation
+    Type: String
+
+  InstanceType:
+    Default: t3.nano
+    Type: String
+
+  KeyName:
+    Default: none
+    Type: String
+
+  PublicSubnetId:
+    Type: AWS::EC2::Subnet::Id
+
+  RouteTableId:
+    Type: String
+
+  VpcCidr:
+    Type: String
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+
+Conditions:
+
+  HasKeyName: !Not [ !Equals [ !Ref KeyName, none ] ]
+
+Resources:
+
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      MaxSize: 1
+      MinSize: 1
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}
+          PropagateAtLaunch: true
+      VPCZoneIdentifier:
+        - !Ref PublicSubnetId
+
+  ElasticIp:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+
+  IamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: !Sub ${AWS::StackName}-associate-address
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:AssociateAddress
+                  - ec2:ModifyInstanceAttribute
+                  - ec2:CreateRoute
+                  - ec2:ReplaceRoute
+                Resource:
+                  - '*'
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+  IamInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref IamRole
+
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        IamInstanceProfile:
+          Arn: !GetAtt IamInstanceProfile.Arn
+        ImageId: !Ref AmiId
+        InstanceType: !Ref InstanceType
+        KeyName: !If [ HasKeyName, !Ref KeyName, !Ref 'AWS::NoValue' ]
+        NetworkInterfaces:
+          - AssociatePublicIpAddress: true
+            DeviceIndex: 0
+            Groups:
+              - !Ref SecurityGroup
+        UserData:
+          'Fn::Base64': !Sub |
+            #!/bin/bash
+            sudo yum update -y
+            sudo yum install -y git
+            sudo git clone ${GitRepoLocation} /opt/cloudformation
+            sudo find /opt/cloudformation/ -type f -iname "*.sh" -exec chmod +x {} \;
+            cd /opt/cloudformation/sh
+            sudo ./common/yum.sh
+            ./nat-instance/associate-address.sh ${ElasticIp.AllocationId}
+            ./nat-instance/disable-source-checks.sh
+            ./nat-instance/replace-route.sh ${RouteTableId}
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Ref AWS::StackName
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref VpcCidr
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: !Ref VpcCidr
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref VpcCidr
+      VpcId: !Ref VpcId

@@ -1,0 +1,174 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+
+  BackupRetentionPeriod:
+    Default: 7
+    Type: String
+
+  ClusterName:
+    Type: String
+
+  DatabaseName:
+    Default: none
+    Type: String
+
+  DeletionProtection:
+    AllowedValues:
+      - true
+      - false
+    Default: true
+    Type: String
+
+  EngineVersion:
+    Default: 5.7.mysql_aurora.2.08.2
+    Type: String
+
+  KmsKeyId:
+    Default: none
+    Type: String
+
+  MasterUsername:
+    Default: root
+    Type: String
+
+  MasterUserPassword:
+    Default: password
+    Type: String
+
+  Port:
+    Default: 3306
+    Type: String
+
+  Sequence:
+    Default: 1
+    Type: String
+
+  SlowQueryLogGroupRetention:
+    Default: 30
+    Type: String
+
+  SnapshotIdentifier:
+    Default: none
+    Type: String
+
+  Stage:
+    Type: String
+
+  SubnetIds:
+    Type: CommaDelimitedList
+
+  TwoAvailabilityZones:
+    AllowedValues:
+      - true
+      - false
+    Default: true
+    Type: String
+
+  VpcCidr:
+    Type: String
+
+  VpcId:
+    Type: String
+
+Conditions:
+
+  HasAvailabilityZoneB: !Equals [ !Ref TwoAvailabilityZones, true ]
+  HasDatabaseName: !Not [ !Equals [ !Ref DatabaseName, none ] ]
+  HasKmsKeyId: !Not [ !Equals [ !Ref KmsKeyId, none ] ]
+  HasSnapshotIdentifier: !Not [ !Equals [ !Ref SnapshotIdentifier, none ] ]
+
+Resources:
+
+  CloudWatchLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/rds/cluster/${RdsCluster}/slowquery
+      RetentionInDays: !Ref SlowQueryLogGroupRetention
+
+  ClusterParameterGroup:
+    Type: AWS::RDS::DBClusterParameterGroup
+    Properties:
+      Description: RdsClusterParameterGroup
+      Family: aurora-mysql5.7
+      Parameters:
+        slow_query_log: 1
+
+  InstanceParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Description: DBParameterGroup
+      Family: aurora-mysql5.7
+      Parameters:
+        slow_query_log: 1
+
+  RdsCluster:
+    Type: AWS::RDS::DBCluster
+    Properties:
+      AvailabilityZones:
+        - !Sub ${AWS::Region}a
+        - !If
+          - HasAvailabilityZoneB
+          - !Sub ${AWS::Region}b
+          - !Ref AWS::NoValue
+      BackupRetentionPeriod: !Ref BackupRetentionPeriod
+      DatabaseName: !If [ HasDatabaseName, !Ref DatabaseName, !Ref 'AWS::NoValue' ]
+      DBClusterIdentifier: !Sub ${ClusterName}-${Stage}-aurora-cluster-${Sequence}
+      DBClusterParameterGroupName: !Ref ClusterParameterGroup
+      DBSubnetGroupName: !Ref SubnetGroup
+      DeletionProtection: !Ref DeletionProtection
+      EnableCloudwatchLogsExports:
+        - slowquery
+      Engine: aurora-mysql
+      EngineVersion: !Ref EngineVersion
+      KmsKeyId: !If [ HasKmsKeyId, !Ref KmsKeyId, !Ref 'AWS::NoValue' ]
+      MasterUsername: !Ref MasterUsername
+      MasterUserPassword: !Ref MasterUserPassword
+      Port: !Ref Port
+      SnapshotIdentifier: !If [ HasSnapshotIdentifier, !Ref SnapshotIdentifier, !Ref 'AWS::NoValue' ]
+      StorageEncrypted: !If [ HasKmsKeyId, true, false ]
+      VpcSecurityGroupIds:
+        - !Ref SecurityGroup
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: SecurityGroup
+      SecurityGroupIngress:
+        - CidrIp: !Ref VpcCidr
+          FromPort: !Ref Port
+          ToPort: !Ref Port
+          IpProtocol: tcp
+      VpcId: !Ref VpcId
+
+  SubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: SubnetGroup
+      SubnetIds: !Ref SubnetIds
+
+Outputs:
+
+  DBClusterIdentifier:
+    Value: !Ref RdsCluster
+
+  InstanceParameterGroup:
+    Value: !Ref InstanceParameterGroup
+
+  Password:
+    Value: !Ref MasterUserPassword
+
+  Port:
+    Value: !Ref Port
+
+  ReadEndpoint:
+    Value: !GetAtt RdsCluster.ReadEndpoint.Address
+
+  SecurityGroup:
+    Value: !Ref SecurityGroup
+
+  UserName:
+    Value: !Ref MasterUsername
+
+  WriteEndpoint:
+    Value: !GetAtt RdsCluster.Endpoint.Address

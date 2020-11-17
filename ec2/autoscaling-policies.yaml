@@ -1,0 +1,46 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+
+  AutoScalingGroupName:
+    Type: String
+
+  Cooldown:
+    Default: 300
+    Type: String
+
+  PolicyType:
+    AllowedValues:
+      - SimpleScaling
+      - StepScaling
+      - TargetTrackingScaling
+    Type: String
+
+  TargetCpuUtilization:
+    Default: 10
+    Type: String
+
+  Warmup:
+    Default: 300
+    Type: String
+
+Conditions:
+
+  IsTargetTrackingScalingPolicyType: !Equals [ !Ref PolicyType, TargetTrackingScaling ]
+
+Resources:
+
+  TargetTrackingScalingAutoScalingPolicy:
+    Condition: IsTargetTrackingScalingPolicyType
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref AutoScalingGroupName
+      Cooldown: !Ref Cooldown
+      EstimatedInstanceWarmup: !Ref Warmup
+      PolicyType: !Ref PolicyType
+      TargetTrackingConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ASGAverageCPUUtilization
+        TargetValue: !Ref TargetCpuUtilization
+
+#Outputs:

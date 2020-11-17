@@ -1,0 +1,173 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+
+  AmiId:
+    Type: AWS::EC2::Image::Id
+
+  DnsTtl:
+    Default: 300
+    Type: String
+
+  DomainName:
+    Default: none
+    Type: String
+
+  GitRepoLocation:
+    Default: https://github.com/trinitycloudapps/cloudformation
+    Type: String
+
+  HostedZoneId:
+    Default: none
+    Type: String
+
+  InstanceType:
+    Default: t3.nano
+    Type: String
+
+  KeyName:
+    Default: none
+    Type: String
+
+  Stage:
+    Type: String
+
+  SubnetIdList:
+    Type: CommaDelimitedList
+
+  VpcCidr:
+    Type: String
+
+  VpcId:
+    Type: String
+
+Conditions:
+
+  CreateRecordSet: !And
+    - !Not [ !Equals [ !Ref DomainName, none ] ]
+    - !Not [ !Equals [ !Ref HostedZoneId, none ] ]
+  HasKeyName: !Not [ !Equals [ !Ref KeyName, none ] ]
+
+Resources:
+
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      MaxSize: 1
+      MinSize: 1
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}
+          PropagateAtLaunch: true
+        - Key: Stage
+          Value: !Ref Stage
+          PropagateAtLaunch: true
+      VPCZoneIdentifier: !Ref SubnetIdList
+
+  ElasticIp:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+
+  IamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: !Sub ${AWS::StackName}-associate-address-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:AssociateAddress
+                Resource:
+                  - '*'
+        - PolicyName: !Sub ${AWS::StackName}-cloudwatch-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogStreams
+                Resource:
+                  - '*'
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore
+      RoleName: !Sub ${AWS::StackName}-iam-role
+
+  IamInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref IamRole
+
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        IamInstanceProfile:
+          Arn: !GetAtt IamInstanceProfile.Arn
+        ImageId: !Ref AmiId
+        InstanceType: !Ref InstanceType
+        KeyName: !If [ HasKeyName, !Ref KeyName, !Ref 'AWS::NoValue' ]
+        NetworkInterfaces:
+          - AssociatePublicIpAddress: true
+            DeviceIndex: 0
+            Groups:
+              - !Ref SecurityGroup
+        UserData:
+          'Fn::Base64': !Sub |
+            #!/bin/bash
+            sudo yum update -y
+            sudo yum install -y git
+            git clone ${GitRepoLocation} /opt/cloudformation
+            find /opt/cloudformation/ -type f -iname "*.sh" -exec chmod +x {} \;
+            cd /opt/cloudformation/sh
+            sudo ./common/yum.sh
+            ./bastion/associate-address.sh ${ElasticIp.AllocationId}
+
+  RecordSet:
+    Condition: CreateRecordSet
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref DomainName
+      ResourceRecords:
+        - !Ref ElasticIp
+      TTL: !Ref DnsTtl
+      Type: A
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub ${VpcId}-bastion-security-group
+      SecurityGroupEgress:
+        - CidrIp: !Ref VpcCidr
+          IpProtocol: -1
+        - CidrIp: '0.0.0.0/0'
+          FromPort: 80
+          IpProtocol: tcp
+          ToPort: 80
+        - CidrIp: '0.0.0.0/0'
+          FromPort: 443
+          IpProtocol: tcp
+          ToPort: 443
+      SecurityGroupIngress:
+        - CidrIp: '0.0.0.0/0'
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+      VpcId: !Ref VpcId

@@ -1,0 +1,153 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+
+  ApplicationName:
+    Type: String
+
+  CertificateArn:
+    Default: none
+    Type: String
+
+  LoadBalancerScheme:
+    AllowedValues:
+      - internal
+      - internet-facing
+    Default: internet-facing
+    Type: String
+
+  Sequence:
+    Default: 1
+    Type: String
+
+  SslPolicy:
+    AllowedValues:
+      - ELBSecurityPolicy-TLS-1-2-2017-01
+      - ELBSecurityPolicy-TLS-1-1-2017-01
+      - ELBSecurityPolicy-2016-08
+      - ELBSecurityPolicy-2015-05
+      - ELBSecurityPolicy-2015-03
+      - ELBSecurityPolicy-2015-02
+      - ELBSecurityPolicy-2014-10
+      - ELBSecurityPolicy-2014-01
+      - ELBSecurityPolicy-2011-08
+    Default: ELBSecurityPolicy-2016-08
+    Type: String
+
+  Stage:
+    Type: String
+
+  SubnetIdList:
+    Type: String
+
+  Type:
+    Default: application
+    Type: String
+
+  VpcCidr:
+    Type: String
+
+  VpcId:
+    Type: String
+
+Conditions:
+
+  CreateHttpListener: !Equals [ !Ref CertificateArn, none ]
+  CreateHttpsListener: !Not [ !Equals [ !Ref CertificateArn, none ] ]
+  IsInternetFacing: !Equals [ !Ref LoadBalancerScheme, internet-facing ]
+
+Resources:
+
+#1) Load Balancer
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      IpAddressType: ipv4
+      Name: !Sub ${ApplicationName}-${Stage}-lb-${Sequence}
+      Scheme: !Ref LoadBalancerScheme
+      SecurityGroups:
+        - !Ref SecurityGroup
+      Subnets: !Split [ ',', !Ref SubnetIdList ]
+      Type: !Ref Type
+
+#2) Load Balancer Listener
+  LoadBalancerHttpListener:
+    Condition: CreateHttpListener
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - FixedResponseConfig:
+            StatusCode: 502
+          Type: fixed-response
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+  LoadBalancerHttpsListener:
+    Condition: CreateHttpsListener
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      Certificates:
+        - CertificateArn: !Ref CertificateArn
+      DefaultActions:
+        - FixedResponseConfig:
+            StatusCode: 502
+          Type: fixed-response
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      SslPolicy: !Ref SslPolicy
+
+  LoadBalancerHttpsRedirectListener:
+    Condition: CreateHttpsListener
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - RedirectConfig:
+            Protocol: HTTPS
+            StatusCode: HTTP_301
+            Port: 443
+          Type: redirect
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+#      SslPolicy: !Ref SslPolicy
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub ${ApplicationName}-${Stage}-${Sequence}-lb-security-group
+      GroupName: !Sub ${ApplicationName}-${Stage}-${Sequence}-lb-security-group
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: !If [ IsInternetFacing, '0.0.0.0/0', !Ref VpcCidr ]
+        - !If
+          - CreateHttpsListener
+          - IpProtocol: tcp
+            FromPort: 443
+            ToPort: 443
+            CidrIp: !If [ IsInternetFacing, '0.0.0.0/0', !Ref VpcCidr ]
+          - !Ref 'AWS::NoValue'
+      Tags:
+        - Key: Name
+          Value: !Sub ${ApplicationName}-${Stage}-${Sequence}-lb-security-group
+      VpcId: !Ref VpcId
+
+Outputs:
+
+  DnsName:
+    Value: !GetAtt LoadBalancer.DNSName
+
+  HostedZoneId:
+    Value: !GetAtt LoadBalancer.CanonicalHostedZoneID
+
+  LoadBalancerArn:
+    Value: !Ref LoadBalancer
+
+  LoadBalancerListenerArn:
+    Value: !If [ CreateHttpsListener, !Ref LoadBalancerHttpsListener, !Ref LoadBalancerHttpListener ]
+
+  SecurityGroup:
+    Value: !Ref SecurityGroup
