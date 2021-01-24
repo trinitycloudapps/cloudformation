@@ -136,10 +136,14 @@ Parameters:
 
 Conditions:
 
-  CreateReplicationRole: !Equals [ !Ref CreateReplicationRole, true ]
+  CreateReplicationRole: !And
+    - !Equals [ !Ref CreateReplicationRole, true ]
+    - !Equals [ !Ref EnableReplication, true ]
   EnableEncryption: !Equals [ !Ref EnableEncryption, true ]
   EnableReplication: !Equals [ !Ref EnableReplication, true ]
-  EnableVersioning: !Equals [ !Ref EnableVersioning, true ]
+  EnableVersioning: !Or
+    - !Equals [ !Ref EnableReplication, true ]
+    - !Equals [ !Ref EnableVersioning, true ]
   HasAccessControl: !Not [ !Equals [ !Ref AccessControl, none ] ]
   HasKmsKeyId: !Not [ !Equals [ !Ref KmsKeyId, none ] ]
   HasReplicaKmsKeyId: !Not [ !Equals [ !Ref ReplicaKmsKeyId, none ] ]

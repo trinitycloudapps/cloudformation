@@ -108,7 +108,9 @@ Parameters:
 
 Conditions:
 
-  HasSecondInstance: !Or [ !Equals [ !Ref TwoInstances, true ], !Equals [ !Ref ThreeInstances, true ] ]
+  HasSecondInstance: !Or
+    - !Equals [ !Ref TwoInstances, true ]
+    - !Equals [ !Ref ThreeInstances, true ]
   HasThirdInstance: !Equals [ !Ref ThreeInstances, true ]
 
 Resources:
