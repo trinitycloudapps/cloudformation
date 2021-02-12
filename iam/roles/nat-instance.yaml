@@ -1,0 +1,52 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+
+  Sequence:
+    Default: 1
+    Type: Number
+
+  Stage:
+    Type: String
+
+Conditions:
+
+Resources:
+
+  IamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: !Sub ${AWS::StackName}-associate-address
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:AssociateAddress
+                  - ec2:ModifyInstanceAttribute
+                  - ec2:CreateRoute
+                  - ec2:ReplaceRoute
+                Resource:
+                  - '*'
+      RoleName: !Sub ${AWS::AccountId}-${AWS::Region}-nat-instance-${Stage}-role-${Sequence}
+
+Outputs:
+
+  RoleArn:
+    Value: !GetAtt IamRole.Arn
+
+  RoleId:
+    Value: !GetAtt IamRole.RoleId
+
+  RoleName:
+    Value: !Ref IamRole
