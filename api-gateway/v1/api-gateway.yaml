@@ -1,0 +1,67 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+
+  Name:
+    Type: String
+
+  Sequence:
+    Default: 1
+    Type: Number
+
+  Stage:
+    Type: String
+
+#Mappings:
+
+#Conditions:
+
+Resources:
+
+  ApiGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      Name: !Sub ${Name}-${Stage}-${Sequence}-api-gateway
+
+  ApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      RestApiId: !Ref ApiGateway
+      StageName: !Sub ${Stage}-${Sequence}
+
+  ApiKey:
+    Type: AWS::ApiGateway::ApiKey
+    Properties:
+      Enabled: true
+      Name: !Sub ${Name}-${Stage}-${Sequence}-api-key
+      StageKeys:
+        - StageKey
+      Tags:
+        - Tag
+      Value: String
+
+  ApiStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+#      ClientCertificateId: String
+      DeploymentId: !Ref ApiGatewayDeployment
+      MethodSettings:
+        - MethodSetting
+      RestApiId: !Ref ApiGateway
+      StageName: !Sub ${Stage}-${Sequence}
+      Tags:
+        - Tag
+      TracingEnabled: Boolean
+      Variables:
+        Key: Value
+
+Outputs:
+
+  ApiId:
+    Value: !Ref ApiGateway
+
+  DeploymentId:
+    Value: !Ref ApiGatewayDeployment
