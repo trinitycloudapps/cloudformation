@@ -37,6 +37,13 @@ Parameters:
     Default: false
     Type: String
 
+  CreateEc2InstanceConnectEndpoints:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
   CreateEc2MessagesEndpoint:
     AllowedValues:
       - true
@@ -132,10 +139,14 @@ Conditions:
 
   CreateApiGatewayEndpoint: !Equals [ !Ref CreateApiGatewayEndpoint, true ]
   CreateAthenaEndpoint: !Equals [ !Ref CreateAthenaEndpoint, true ]
-  CreateCloudWatchEndpoint: !Equals [ !Ref CreateCloudWatchEndpoint, true ]
+  CreateCloudWatchEndpoint: !Or
+    - !Equals [ !Ref CreateCloudWatchEndpoint, true ]
+    - !Equals [ !Ref CreateEc2InstanceConnectEndpoints, true ]
   CreateCodeDeployEndpoint: !Equals [ !Ref CreateCodeDeployEndpoint, true ]
   CreateDynamoDbEndpoint: !Equals [ !Ref CreateDynamoDbEndpoint, true ]
-  CreateEc2MessagesEndpoint: !Equals [ !Ref CreateEc2MessagesEndpoint, true ]
+  CreateEc2MessagesEndpoint: !Or
+    - !Equals [ !Ref CreateEc2InstanceConnectEndpoints, true ]
+    - !Equals [ !Ref CreateEc2MessagesEndpoint, true ]
   CreateKmsEndpoint: !Equals [ !Ref CreateKmsEndpoint, true ]
   CreateLambdaEndpoint: !Equals [ !Ref CreateLambdaEndpoint, true ]
   CreateS3Endpoint: !Equals [ !Ref CreateS3Endpoint, true ]
@@ -143,8 +154,12 @@ Conditions:
   CreateSimpleEmailServiceEndpoint: !Equals [ !Ref CreateSimpleEmailServiceEndpoint, true ]
   CreateSimpleNotificationServiceEndpoint: !Equals [ !Ref CreateSimpleNotificationServiceEndpoint, true ]
   CreateSimpleQueueServiceEndpoint: !Equals [ !Ref CreateSimpleQueueServiceEndpoint, true ]
-  CreateSystemsManagerEndpoint: !Equals [ !Ref CreateSystemsManagerEndpoint, true ]
-  CreateSystemsManagerMessagesEndpoint: !Equals [ !Ref CreateSystemsManagerMessagesEndpoint, true ]
+  CreateSystemsManagerEndpoint: !Or
+    - !Equals [ !Ref CreateEc2InstanceConnectEndpoints, true ]
+    - !Equals [ !Ref CreateSystemsManagerEndpoint, true ]
+  CreateSystemsManagerMessagesEndpoint: !Or
+    - !Equals [ !Ref CreateEc2InstanceConnectEndpoints, true ]
+    - !Equals [ !Ref CreateSystemsManagerMessagesEndpoint, true ]
 
 Resources:
 
