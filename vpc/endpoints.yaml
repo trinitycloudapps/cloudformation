@@ -135,7 +135,7 @@ Conditions:
   CreateCloudWatchEndpoint: !Equals [ !Ref CreateCloudWatchEndpoint, true ]
   CreateCodeDeployEndpoint: !Equals [ !Ref CreateCodeDeployEndpoint, true ]
   CreateDynamoDbEndpoint: !Equals [ !Ref CreateDynamoDbEndpoint, true ]
-  CreateEc2MessagesEndpoint: !Equals [ !Ref CreateCloudWatchEndpoint, true ]
+  CreateEc2MessagesEndpoint: !Equals [ !Ref CreateEc2MessagesEndpoint, true ]
   CreateKmsEndpoint: !Equals [ !Ref CreateKmsEndpoint, true ]
   CreateLambdaEndpoint: !Equals [ !Ref CreateLambdaEndpoint, true ]
   CreateS3Endpoint: !Equals [ !Ref CreateS3Endpoint, true ]
@@ -143,8 +143,8 @@ Conditions:
   CreateSimpleEmailServiceEndpoint: !Equals [ !Ref CreateSimpleEmailServiceEndpoint, true ]
   CreateSimpleNotificationServiceEndpoint: !Equals [ !Ref CreateSimpleNotificationServiceEndpoint, true ]
   CreateSimpleQueueServiceEndpoint: !Equals [ !Ref CreateSimpleQueueServiceEndpoint, true ]
-  CreateSystemsManagerEndpoint: !Equals [ !Ref CreateCloudWatchEndpoint, true ]
-  CreateSystemsManagerMessagesEndpoint: !Equals [ !Ref CreateCloudWatchEndpoint, true ]
+  CreateSystemsManagerEndpoint: !Equals [ !Ref CreateSystemsManagerEndpoint, true ]
+  CreateSystemsManagerMessagesEndpoint: !Equals [ !Ref CreateSystemsManagerMessagesEndpoint, true ]
 
 Resources:
 
