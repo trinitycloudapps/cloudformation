@@ -24,7 +24,7 @@ Resources:
     Properties:
       Name: !Sub ubuntu-${Stage}-${Sequence}-install-php-7-4-component
       Platform: Linux
-      Version: ${Version}
+      Version: !Ref Version
       Data: |
         name: InstallPhp74
         description: Downloads and Installs Php 7.4
