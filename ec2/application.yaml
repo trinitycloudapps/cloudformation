@@ -321,7 +321,7 @@ Outputs:
     Value: !Ref IamRole
 
   InstanceProfile:
-    Value: !Ref InstanceProfile
+    Value: !Ref IamInstanceProfile
 
   InstanceType:
     Value: !Ref InstanceType
