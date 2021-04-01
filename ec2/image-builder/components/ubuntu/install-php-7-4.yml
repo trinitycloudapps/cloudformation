@@ -1,6 +1,13 @@
 AWSTemplateFormatVersion: 2010-09-09
 
-#Parameters:
+Parameters:
+
+  Sequence:
+    Default: 1
+    Type: String
+
+  Stage:
+    Type: String
 
 #Mappings:
 
