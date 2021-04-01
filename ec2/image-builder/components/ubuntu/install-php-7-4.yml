@@ -9,6 +9,10 @@ Parameters:
   Stage:
     Type: String
 
+  Version:
+    Default: 0.0.1
+    Type: String
+
 #Mappings:
 
 #Conditions:
@@ -20,7 +24,7 @@ Resources:
     Properties:
       Name: !Sub ubuntu-${Stage}-${Sequence}-install-php-7-4-component
       Platform: Linux
-      Version: 0.0.1
+      Version: ${Version}
       Data: |
         name: InstallPhp74
         description: Downloads and Installs Php 7.4
