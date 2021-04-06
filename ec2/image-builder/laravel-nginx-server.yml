@@ -48,6 +48,7 @@ Resources:
       Version: 0.0.1
       ParentImage: !Sub arn:${AWS::Partition}:imagebuilder:${AWS::Region}:aws:image/ubuntu-server-20-lts-x86/${ParentImageVersion}
       Components:
+        - ComponentArn: !Sub arn:${AWS::Partition}:imagebuilder:${AWS::Region}:aws:component/amazon-cloudwatch-agent-linux/1.0.0/1
         - ComponentArn: !Sub arn:${AWS::Partition}:imagebuilder:${AWS::Region}:${AWS::AccountId}:component/ubuntu-${Stage}-${Sequence}-install-php-7-4-component/${ComponentVersion}/1
 
   InfrastructureConfiguration:
