@@ -249,6 +249,7 @@ Resources:
     Properties:
       AvailabilityZone: !Select [0, !GetAZs '']
       CidrBlock: !Sub 10.${CidrClassB}.48.0/20
+      MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
           Value: !Sub ${Name}-${Stage}-${Sequence}-public-subnet-a
@@ -290,6 +291,7 @@ Resources:
     Properties:
       AvailabilityZone: !Select [1, !GetAZs '']
       CidrBlock: !Sub 10.${CidrClassB}.64.0/20
+      MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
           Value: !Sub ${Name}-${Stage}-${Sequence}-public-subnet-b
