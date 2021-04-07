@@ -1,0 +1,44 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+
+  Sequence:
+    Default: 1
+    Type: String
+
+  Stage:
+    Type: String
+
+  Version:
+    Default: 0.0.1
+    Type: String
+
+#Mappings:
+
+#Conditions:
+
+Resources:
+
+  AptUpdateComponent:
+    Type: AWS::ImageBuilder::Component
+    Properties:
+      Name: !Sub ubuntu-${Stage}-${Sequence}-apt-update-component
+      Platform: Linux
+      Version: !Ref Version
+      Data: |
+        name: InstallNginx
+        description: Downloads and Installs Nginx
+        schemaVersion: 1.0
+        phases:
+          - name: build
+            steps:
+              - name: Install
+                action: ExecuteBash
+                inputs:
+                  commands:
+                    - 'apt update'
+
+Outputs:
+
+  ComponentArn:
+    Value: !Ref AptUpdateComponent
