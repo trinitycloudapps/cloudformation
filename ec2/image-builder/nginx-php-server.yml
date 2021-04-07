@@ -44,7 +44,7 @@ Resources:
   ImageRecipe:
     Type: AWS::ImageBuilder::ImageRecipe
     Properties:
-      Name: !Sub ubuntu-${Stage}-${Sequence}-laravel-nginx-server
+      Name: !Sub ubuntu-${Stage}-${Sequence}-nginx-php-server
       Version: 0.0.1
       ParentImage: !Sub arn:${AWS::Partition}:imagebuilder:${AWS::Region}:aws:image/ubuntu-server-20-lts-x86/${ParentImageVersion}
       Components:
