@@ -5,6 +5,20 @@ Parameters:
   CidrClassB:
     Type: String
 
+  EnableDnsHostnames:
+    AllowedValues:
+      - true
+      - false
+    Default: true
+    Type: String
+
+  EnableDnsSupport:
+    AllowedValues:
+      - true
+      - false
+    Default: true
+    Type: String
+
   Name:
     Type: String
 
@@ -308,7 +322,8 @@ Resources:
     Type: AWS::EC2::VPC
     Properties:
       CidrBlock: !Sub 10.${CidrClassB}.0.0/16
-      EnableDnsSupport: true
+      EnableDnsHostnames: !Ref EnableDnsHostnames
+      EnableDnsSupport: !Ref EnableDnsSupport
       Tags:
         - Key: Name
           Value: !Sub ${Name}-${Stage}-${Sequence}-vpc

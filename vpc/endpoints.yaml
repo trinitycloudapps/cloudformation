@@ -1,0 +1,386 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+
+  CreateApiGatewayEndpoint:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
+  CreateAthenaEndpoint:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
+  CreateCloudWatchEndpoint:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
+  CreateCodeDeployEndpoint:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
+  CreateDynamoDbEndpoint:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
+  CreateEc2InstanceConnectEndpoints:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
+  CreateEc2MessagesEndpoint:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
+  CreateKmsEndpoint:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
+  CreateLambdaEndpoint:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
+  CreateS3Endpoint:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
+  CreateSecretsManagerEndpoint:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
+  CreateSimpleEmailServiceEndpoint:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
+  CreateSimpleNotificationServiceEndpoint:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
+  CreateSimpleQueueServiceEndpoint:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
+  CreateSystemsManagerEndpoint:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
+  CreateSystemsManagerMessagesEndpoint:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Type: String
+
+  Name:
+    Type: String
+
+  Sequence:
+    Default: 1
+    Type: String
+
+  Stage:
+    Type: String
+
+  SubnetIdList:
+    Type: List<AWS::EC2::Subnet::Id>
+
+  VpcCidr:
+    Type: String
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+
+#Mappings:
+
+Conditions:
+
+  CreateApiGatewayEndpoint: !Equals [ !Ref CreateApiGatewayEndpoint, true ]
+  CreateAthenaEndpoint: !Equals [ !Ref CreateAthenaEndpoint, true ]
+  CreateCloudWatchEndpoint: !Or
+    - !Equals [ !Ref CreateCloudWatchEndpoint, true ]
+    - !Equals [ !Ref CreateEc2InstanceConnectEndpoints, true ]
+  CreateCodeDeployEndpoint: !Equals [ !Ref CreateCodeDeployEndpoint, true ]
+  CreateDynamoDbEndpoint: !Equals [ !Ref CreateDynamoDbEndpoint, true ]
+  CreateEc2MessagesEndpoint: !Or
+    - !Equals [ !Ref CreateEc2InstanceConnectEndpoints, true ]
+    - !Equals [ !Ref CreateEc2MessagesEndpoint, true ]
+  CreateKmsEndpoint: !Equals [ !Ref CreateKmsEndpoint, true ]
+  CreateLambdaEndpoint: !Equals [ !Ref CreateLambdaEndpoint, true ]
+  CreateS3Endpoint: !Equals [ !Ref CreateS3Endpoint, true ]
+  CreateSecretsManagerEndpoint: !Equals [ !Ref CreateSecretsManagerEndpoint, true ]
+  CreateSimpleEmailServiceEndpoint: !Equals [ !Ref CreateSimpleEmailServiceEndpoint, true ]
+  CreateSimpleNotificationServiceEndpoint: !Equals [ !Ref CreateSimpleNotificationServiceEndpoint, true ]
+  CreateSimpleQueueServiceEndpoint: !Equals [ !Ref CreateSimpleQueueServiceEndpoint, true ]
+  CreateSystemsManagerEndpoint: !Or
+    - !Equals [ !Ref CreateEc2InstanceConnectEndpoints, true ]
+    - !Equals [ !Ref CreateSystemsManagerEndpoint, true ]
+  CreateSystemsManagerMessagesEndpoint: !Or
+    - !Equals [ !Ref CreateEc2InstanceConnectEndpoints, true ]
+    - !Equals [ !Ref CreateSystemsManagerMessagesEndpoint, true ]
+
+Resources:
+
+  ApiGatewayEndpoint:
+    Condition: CreateApiGatewayEndpoint
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !Ref GeneralEndpointSecurityGroup
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.execute-api
+      SubnetIds: !Ref SubnetIdList
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+
+  AthenaEndpoint:
+    Condition: CreateAthenaEndpoint
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !Ref AthenaEndpointSecurityGroup
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.athena
+      SubnetIds: !Ref SubnetIdList
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+
+  AthenaEndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub ${Name}-${Stage}-${Sequence}-athena-endpoint-security-group
+      GroupName: !Sub ${Name}-${Stage}-${Sequence}-athena-endpoint-security-group
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 444
+          ToPort: 444
+          CidrIp: '0.0.0.0/0'
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 444
+          ToPort: 444
+          CidrIp: !Ref VpcCidr
+      Tags:
+        - Key: Name
+          Value: !Sub ${Name}-${Stage}-${Sequence}-athena-endpoint-security-group
+      VpcId: !Ref VpcId
+
+  CloudWatchEndpoint:
+    Condition: CreateCloudWatchEndpoint
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !Ref GeneralEndpointSecurityGroup
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.monitoring
+      SubnetIds: !Ref SubnetIdList
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+
+  CodeDeployEndpoint:
+    Condition: CreateCodeDeployEndpoint
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !Ref GeneralEndpointSecurityGroup
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.codedeploy
+      SubnetIds: !Ref SubnetIdList
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+
+  DynamoDbEndpoint:
+    Condition: CreateDynamoDbEndpoint
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !Ref GeneralEndpointSecurityGroup
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.dynamodb
+      SubnetIds: !Ref SubnetIdList
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+
+  Ec2MessagesEndpoint:
+    Condition: CreateEc2MessagesEndpoint
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !Ref GeneralEndpointSecurityGroup
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ec2messages
+      SubnetIds: !Ref SubnetIdList
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+
+  GeneralEndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub ${Name}-${Stage}-${Sequence}-endpoint-security-group
+      GroupName: !Sub ${Name}-${Stage}-${Sequence}-endpoint-security-group
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: '0.0.0.0/0'
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref VpcCidr
+      Tags:
+        - Key: Name
+          Value: !Sub ${Name}-${Stage}-${Sequence}-endpoint-security-group
+      VpcId: !Ref VpcId
+
+  KmsEndpoint:
+    Condition: CreateKmsEndpoint
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !Ref GeneralEndpointSecurityGroup
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.kms
+      SubnetIds: !Ref SubnetIdList
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+
+  LambdaEndpoint:
+    Condition: CreateLambdaEndpoint
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !Ref GeneralEndpointSecurityGroup
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.lambda
+      SubnetIds: !Ref SubnetIdList
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+
+  S3Endpoint:
+    Condition: CreateS3Endpoint
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !Ref GeneralEndpointSecurityGroup
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      SubnetIds: !Ref SubnetIdList
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+
+  SecretsManagerEndpoint:
+    Condition: CreateS3Endpoint
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !Ref GeneralEndpointSecurityGroup
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.secretsmanager
+      SubnetIds: !Ref SubnetIdList
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+
+  SimpleEmailServiceEndpoint:
+    Condition: CreateSimpleEmailServiceEndpoint
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !Ref GeneralEndpointSecurityGroup
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.email-smtp
+      SubnetIds: !Ref SubnetIdList
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+
+  SimpleNotificationServiceEndpoint:
+    Condition: CreateSimpleNotificationServiceEndpoint
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !Ref GeneralEndpointSecurityGroup
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.sns
+      SubnetIds: !Ref SubnetIdList
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+
+  SimpleQueueServiceEndpoint:
+    Condition: CreateSimpleQueueServiceEndpoint
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !Ref GeneralEndpointSecurityGroup
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.sqs
+      SubnetIds: !Ref SubnetIdList
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+
+  SystemsManagerEndpoint:
+    Condition: CreateSystemsManagerEndpoint
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !Ref GeneralEndpointSecurityGroup
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ssm
+      SubnetIds: !Ref SubnetIdList
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+
+  SystemsManagerMessagesEndpoint:
+    Condition: CreateSystemsManagerMessagesEndpoint
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !Ref GeneralEndpointSecurityGroup
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ssmmessages
+      SubnetIds: !Ref SubnetIdList
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+
+#Outputs:
