@@ -36,7 +36,6 @@ Resources:
                 action: ExecuteBash
                 inputs:
                   commands:
-                    - 'apt update'
                     - 'apt install -y php-bcmath php-cli php-curl php-common php-json php-mbstring php-mysql php-xml php-zip'
           - name: validate
             steps:
