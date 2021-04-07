@@ -48,4 +48,4 @@ Resources:
 Outputs:
 
   ComponentArn:
-    Value: !Ref InstallPhp74Component
+    Value: !Ref InstallNginxComponent
