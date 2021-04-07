@@ -1,0 +1,74 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+
+  BuildSubnetId:
+    Type: AWS::EC2::Subnet::Id
+
+  BuildInstanceProfile:
+    Type: String
+
+  BuildInstanceType:
+    Type: String
+
+  BuildSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+
+  ComponentVersion:
+    Default: 0.0.1
+    Type: String
+
+  ParentImageVersion:
+    Default: 2021.3.25
+    Type: String
+
+  Sequence:
+    Default: 1
+    Type: Number
+
+  Stage:
+    Type: String
+
+#Mappings:
+
+#Conditions:
+
+Resources:
+
+  Image:
+    Type: AWS::ImageBuilder::Image
+    Properties:
+      ImageRecipeArn: !Ref ImageRecipe
+      InfrastructureConfigurationArn: !Ref InfrastructureConfiguration
+
+  ImageRecipe:
+    Type: AWS::ImageBuilder::ImageRecipe
+    Properties:
+      Name: !Sub ubuntu-${Stage}-${Sequence}-nginx-php-server
+      Version: 0.0.1
+      ParentImage: !Sub arn:${AWS::Partition}:imagebuilder:${AWS::Region}:aws:image/ubuntu-server-20-lts-x86/${ParentImageVersion}
+      Components:
+        - ComponentArn: !Sub arn:${AWS::Partition}:imagebuilder:${AWS::Region}:aws:component/amazon-cloudwatch-agent-linux/1.0.0/1
+        - ComponentArn: !Sub arn:${AWS::Partition}:imagebuilder:${AWS::Region}:${AWS::AccountId}:component/ubuntu-${Stage}-${Sequence}-apt-update-component/${ComponentVersion}/1
+        - ComponentArn: !Sub arn:${AWS::Partition}:imagebuilder:${AWS::Region}:${AWS::AccountId}:component/ubuntu-${Stage}-${Sequence}-install-php-7-4-component/${ComponentVersion}/1
+        - ComponentArn: !Sub arn:${AWS::Partition}:imagebuilder:${AWS::Region}:${AWS::AccountId}:component/ubuntu-${Stage}-${Sequence}-install-nginx-component/${ComponentVersion}/1
+
+  InfrastructureConfiguration:
+    Type: AWS::ImageBuilder::InfrastructureConfiguration
+    Properties:
+      Name: !Sub ubuntu-server-20-image-${Stage}-${Sequence}-infrastructure-configuration
+      InstanceProfileName: !Ref BuildInstanceProfile
+      InstanceTypes:
+        - !Ref BuildInstanceType
+      SecurityGroupIds:
+        - !Ref BuildSecurityGroupId
+      SubnetId: !Ref BuildSubnetId
+      TerminateInstanceOnFailure: false
+
+Outputs:
+
+  AmiId:
+    Value: !GetAtt Image.ImageId
+
+  Image:
+    Value: !Ref Image

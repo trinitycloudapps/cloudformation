@@ -1,0 +1,51 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+
+  Sequence:
+    Default: 1
+    Type: String
+
+  Stage:
+    Type: String
+
+  Version:
+    Default: 0.0.1
+    Type: String
+
+#Mappings:
+
+#Conditions:
+
+Resources:
+
+  InstallPhp74Component:
+    Type: AWS::ImageBuilder::Component
+    Properties:
+      Name: !Sub ubuntu-${Stage}-${Sequence}-install-php-7-4-component
+      Platform: Linux
+      Version: !Ref Version
+      Data: |
+        name: InstallPhp74
+        description: Downloads and Installs Php 7.4
+        schemaVersion: 1.0
+        phases:
+          - name: build
+            steps:
+              - name: Install
+                action: ExecuteBash
+                inputs:
+                  commands:
+                    - 'apt install -y php-bcmath php-cli php-curl php-common php-json php-mbstring php-mysql php-xml php-zip'
+          - name: validate
+            steps:
+              - name: ValidateResponse
+                action: ExecuteBash
+                inputs:
+                  commands:
+                    - 'php --version'
+
+Outputs:
+
+  ComponentArn:
+    Value: !Ref InstallPhp74Component
