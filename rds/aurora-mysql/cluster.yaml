@@ -33,7 +33,7 @@ Parameters:
     Type: String
 
   MasterUserPassword:
-    Default: password
+    Default: none
     Type: String
 
   Port:
@@ -73,6 +73,7 @@ Parameters:
 
 Conditions:
 
+  CreateSecretPassword: !Equals [ !Ref MasterUserPassword, none ]
   HasAvailabilityZoneB: !Equals [ !Ref TwoAvailabilityZones, true ]
   HasDatabaseName: !Not [ !Equals [ !Ref DatabaseName, none ] ]
   HasKmsKeyId: !Not [ !Equals [ !Ref KmsKeyId, none ] ]
@@ -93,6 +94,24 @@ Resources:
       Family: aurora-mysql5.7
       Parameters:
         slow_query_log: 1
+
+  ClusterSecret:
+    Condition: CreateSecretPassword
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      ExcludeCharacters: '"@/\'
+      GenerateSecretString:
+      GenerateStringKey: 'password'
+      PasswordLength: 16
+      SecretStringTemplate: !Sub '{"username": "${MasterUsername}"}'
+
+  SecretRDSInstanceAttachment:
+    Condition: CreateSecretPassword
+    Type: AWS::SecretsManager::SecretTargetAttachment
+    Properties:
+      SecretId: !Ref ClusterSecret
+      TargetId: !Ref RdsCluster
+      TargetType: AWS::RDS::DBCluster
 
   InstanceParameterGroup:
     Type: AWS::RDS::DBParameterGroup
@@ -122,8 +141,8 @@ Resources:
       Engine: aurora-mysql
       EngineVersion: !Ref EngineVersion
       KmsKeyId: !If [ HasKmsKeyId, !Ref KmsKeyId, !Ref 'AWS::NoValue' ]
-      MasterUsername: !Ref MasterUsername
-      MasterUserPassword: !Ref MasterUserPassword
+      MasterUsername: !If [ CreateSecretPassword, !Ref 'AWS::NoValue', !Ref MasterUsername ]
+      MasterUserPassword: !If [ CreateSecretPassword, !Ref 'AWS::NoValue', !Ref MasterUserPassword ]
       Port: !Ref Port
       SnapshotIdentifier: !If [ HasSnapshotIdentifier, !Ref SnapshotIdentifier, !Ref 'AWS::NoValue' ]
       StorageEncrypted: !If [ HasKmsKeyId, true, false ]
