@@ -99,13 +99,13 @@ Resources:
     Condition: CreateSecretPassword
     Type: AWS::SecretsManager::Secret
     Properties:
-      ExcludeCharacters: '"@/\'
       GenerateSecretString:
-      GenerateStringKey: 'password'
-      PasswordLength: 16
-      SecretStringTemplate: !Sub '{"username": "${MasterUsername}"}'
+        ExcludeCharacters: '"@/\'
+        GenerateStringKey: 'password'
+        PasswordLength: 16
+        SecretStringTemplate: !Sub '{"username": "${MasterUsername}"}'
 
-  SecretRDSInstanceAttachment:
+  ClusterSecretAttachment:
     Condition: CreateSecretPassword
     Type: AWS::SecretsManager::SecretTargetAttachment
     Properties:
