@@ -1,0 +1,47 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+
+  Sequence:
+    Default: none
+    Type: Number
+
+  Service:
+    AllowedValues:
+      - apigateway
+      - autoscaling
+      - cloud9
+      - codedeploy
+      - ec2
+      - ecs
+      - elasticache
+      - elasticfilesystem
+      - elasticloadbalancing
+      - globalaccelerator
+      - rds
+      - s3
+      - spot
+      - spotfleet
+      - support
+      - trustedadvisor
+    Type: String
+
+Conditions:
+
+  HasSequence: !Not [ !Equals [ !Ref Sequence, none ] ]
+
+Resources:
+
+  ServiceLinkedRole:
+    Type: AWS::IAM::ServiceLinkedRole
+    Properties:
+      AWSServiceName: !Sub ${Service}.amazonaws.com
+      CustomSuffix: !If
+        - HasSequence
+        - !Ref Sequence
+        - !Ref 'AWS::NoValue'
+
+Outputs:
+
+  ServiceLinkedRoleId:
+    Value: !Ref ServiceLinkedRole

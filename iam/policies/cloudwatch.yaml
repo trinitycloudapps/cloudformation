@@ -1,0 +1,33 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+
+  Sequence:
+    Default: 1
+    Type: Number
+
+  Stage:
+    Type: String
+
+Resources:
+
+  IamPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+              - logs:DescribeLogStreams
+            Effect: Allow
+            Resource:
+              - '*'
+      PolicyName: !Sub cloudwatch-policy-${Stage}-${Sequence}
+
+Outputs:
+
+  PolicyId:
+    Value: !Ref IamPolicy
